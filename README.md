@@ -1,6 +1,6 @@
-# Polyhedg Clone
+# Hedgra Clone
 
-A Next.js clone of the [polyhedg.com](https://www.polyhedg.com/) website.
+A Next.js clone of the hedgra website.
 
 ## 🚀 Live Demo
 
