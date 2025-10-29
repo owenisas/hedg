@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
+import { mockMarkets } from '@/lib/mockData';
 
 interface Node {
   id: string;
-  label: string;
-  type: 'central' | 'metric';
+  title: string;
+  fit: number;
+  liquidity: number;
+  type: 'central' | 'market';
   x?: number;
   y?: number;
   fx?: number | null;
@@ -44,45 +47,34 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
     // Clear previous content
     d3.select(svgRef.current).selectAll("*").remove();
 
-    // Define nodes
+    // Get markets from mock data
+    const markets = mockMarkets.slice(0, 8); // Limit to 8 markets for better visualization
+
+    // Create nodes for markets
     const nodes: Node[] = [
-      // Central nodes
-      { id: 'volatility', label: 'Volatility', type: 'central' },
-      { id: 'exposure', label: 'Exposure', type: 'central' },
-      
-      // Metric nodes
-      { id: 'sharpe-ratio', label: 'Sharpe Ratio', type: 'metric' },
-      { id: 'max-drawdown', label: 'Max Drawdown', type: 'metric' },
-      { id: 'beta', label: 'Beta', type: 'metric' },
-      { id: 'var', label: 'VaR (95%)', type: 'metric' },
-      { id: 'risk-score', label: 'Risk Score', type: 'metric' },
-      { id: 'correlation', label: 'Correlation', type: 'metric' },
-      { id: 'duration', label: 'Duration', type: 'metric' },
-      { id: 'hedge-ratio', label: 'Hedge Ratio', type: 'metric' },
-      { id: 'liquidity', label: 'Liquidity', type: 'metric' },
-      { id: 'cost-basis', label: 'Cost Basis', type: 'metric' },
+      // Central exposure node
+      { 
+        id: 'exposure', 
+        title: 'Exposure Statement', 
+        fit: 1, 
+        liquidity: 1,
+        type: 'central' 
+      },
+      // Market nodes
+      ...markets.map((market, index) => ({
+        id: market.id,
+        title: market.title,
+        fit: 0.7 + (index * 0.05), // Vary fit scores
+        liquidity: market.liquidity / 1000000, // Normalize liquidity
+        type: 'market' as const
+      }))
     ];
 
-    // Define links
-    const links: Link[] = [
-      // Volatility connections
-      { source: 'volatility', target: 'sharpe-ratio' },
-      { source: 'volatility', target: 'max-drawdown' },
-      { source: 'volatility', target: 'beta' },
-      { source: 'volatility', target: 'var' },
-      { source: 'volatility', target: 'risk-score' },
-      
-      // Exposure connections
-      { source: 'exposure', target: 'risk-score' },
-      { source: 'exposure', target: 'hedge-ratio' },
-      { source: 'exposure', target: 'liquidity' },
-      { source: 'exposure', target: 'cost-basis' },
-      
-      // Cross connections
-      { source: 'correlation', target: 'duration' },
-      { source: 'hedge-ratio', target: 'correlation' },
-      { source: 'risk-score', target: 'correlation' },
-    ];
+    // Create links between exposure and markets
+    const links: Link[] = markets.map(market => ({
+      source: 'exposure',
+      target: market.id
+    }));
 
     const svg = d3.select(svgRef.current)
       .attr('width', width)
@@ -134,29 +126,46 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
       .attr('offset', '100%')
       .attr('stop-color', '#f0f0f0');
 
-    // Gradient for metric nodes
-    const metricGradient = defs.append('radialGradient')
-      .attr('id', 'metric-gradient');
+    // Gradient for market nodes
+    const marketGradient = defs.append('radialGradient')
+      .attr('id', 'market-gradient');
     
-    metricGradient.append('stop')
+    marketGradient.append('stop')
       .attr('offset', '0%')
-      .attr('stop-color', '#a78bfa');
+      .attr('stop-color', '#10b981'); // Green for good fit
     
-    metricGradient.append('stop')
+    marketGradient.append('stop')
       .attr('offset', '100%')
-      .attr('stop-color', '#7c3aed');
+      .attr('stop-color', '#059669'); // Darker green
+
+    // Gradient for low fit market nodes
+    const lowFitGradient = defs.append('radialGradient')
+      .attr('id', 'low-fit-gradient');
+    
+    lowFitGradient.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#ef4444'); // Red for low fit
+    
+    lowFitGradient.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#dc2626'); // Darker red
 
     // Create force simulation with reduced alpha decay for stability
     const simulation = d3.forceSimulation(nodes as d3.SimulationNodeDatum[])
       .force('link', d3.forceLink(links)
         .id((d: any) => d.id)
-        .distance(150)
+        .distance(200)
         .strength(0.5))
       .force('charge', d3.forceManyBody()
-        .strength(-800))
+        .strength(-500))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide()
-        .radius((d: any) => d.type === 'central' ? 65 : 45))
+        .radius((d: any) => {
+          // Calculate size based on fit and liquidity
+          const baseSize = d.type === 'central' ? 60 : 40;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        }))
       .alphaDecay(0.02); // Slower decay for smoother settling
 
     simulationRef.current = simulation;
@@ -195,32 +204,102 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
 
     // Add outer glow circle
     node.append('circle')
-      .attr('r', (d: any) => d.type === 'central' ? 54 : 34)
-      .attr('fill', (d: any) => d.type === 'central' ? '#6366f144' : '#8b5cf644')
+      .attr('r', (d: any) => {
+        const baseSize = d.type === 'central' ? 54 : 34;
+        const fitFactor = d.fit || 0.5;
+        return baseSize * (0.5 + 0.5 * fitFactor);
+      })
+      .attr('fill', (d: any) => {
+        if (d.type === 'central') {
+          return '#6366f144';
+        } else {
+          // Color based on fit score
+          return d.fit > 0.6 ? '#10b98144' : '#ef444444';
+        }
+      })
       .attr('class', 'glow-circle');
 
-    // Add main circle with gradient
+    // Add main circle with gradient based on fit score
     node.append('circle')
-      .attr('r', (d: any) => d.type === 'central' ? 50 : 30)
-      .attr('fill', (d: any) => d.type === 'central' ? 'url(#central-gradient)' : 'url(#metric-gradient)')
-      .attr('stroke', (d: any) => d.type === 'central' ? '#e5e7eb' : '#a78bfa')
+      .attr('r', (d: any) => {
+        const baseSize = d.type === 'central' ? 50 : 30;
+        const fitFactor = d.fit || 0.5;
+        return baseSize * (0.5 + 0.5 * fitFactor);
+      })
+      .attr('fill', (d: any) => {
+        if (d.type === 'central') {
+          return 'url(#central-gradient)';
+        } else {
+          // Use different gradient based on fit score
+          return d.fit > 0.6 ? 'url(#market-gradient)' : 'url(#low-fit-gradient)';
+        }
+      })
+      .attr('stroke', (d: any) => d.type === 'central' ? '#e5e7eb' : '#10b981')
       .attr('stroke-width', 2)
       .attr('filter', 'drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.4))')
       .attr('class', 'main-circle');
 
     // Add inner highlight
     node.append('circle')
-      .attr('r', (d: any) => d.type === 'central' ? 48 : 28)
+      .attr('r', (d: any) => {
+        const baseSize = d.type === 'central' ? 48 : 28;
+        const fitFactor = d.fit || 0.5;
+        return baseSize * (0.5 + 0.5 * fitFactor);
+      })
       .attr('fill', 'none')
       .attr('stroke', 'rgba(255, 255, 255, 0.3)')
       .attr('stroke-width', 1.5)
       .attr('class', 'highlight-circle');
 
-    // Add text labels
-    node.append('text')
-      .text((d: any) => d.label)
+    // Add fit score badge
+    node.filter((d: any) => d.type === 'market')
+      .append('circle')
+      .attr('r', 12)
+      .attr('cx', (d: any) => {
+        const baseSize = 30;
+        const fitFactor = d.fit || 0.5;
+        return (baseSize * (0.5 + 0.5 * fitFactor)) - 10;
+      })
+      .attr('cy', (d: any) => {
+        const baseSize = 30;
+        const fitFactor = d.fit || 0.5;
+        return -1 * (baseSize * (0.5 + 0.5 * fitFactor)) + 10;
+      })
+      .attr('fill', 'rgba(0, 0, 0, 0.7)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.4)')
+      .attr('stroke-width', 1);
+
+    // Add fit score text
+    node.filter((d: any) => d.type === 'market')
+      .append('text')
+      .text((d: any) => `${Math.round((d.fit || 0) * 100)}%`)
+      .attr('x', (d: any) => {
+        const baseSize = 30;
+        const fitFactor = d.fit || 0.5;
+        return (baseSize * (0.5 + 0.5 * fitFactor)) - 10;
+      })
+      .attr('y', (d: any) => {
+        const baseSize = 30;
+        const fitFactor = d.fit || 0.5;
+        return -1 * (baseSize * (0.5 + 0.5 * fitFactor)) + 14;
+      })
       .attr('text-anchor', 'middle')
       .attr('dy', '0.35em')
+      .attr('fill', '#ffffff')
+      .attr('font-size', '10px')
+      .attr('font-weight', '600')
+      .attr('pointer-events', 'none')
+      .style('user-select', 'none');
+
+    // Add text labels
+    node.append('text')
+      .text((d: any) => {
+        // Truncate long titles
+        const title = d.title;
+        return title.length > 20 ? title.substring(0, 17) + '...' : title;
+      })
+      .attr('text-anchor', 'middle')
+      .attr('dy', (d: any) => d.type === 'central' ? '0.35em' : '1.5em')
       .attr('fill', (d: any) => d.type === 'central' ? '#1f2937' : '#ffffff')
       .attr('font-size', (d: any) => d.type === 'central' ? '14px' : '11px')
       .attr('font-weight', '600')
@@ -228,16 +307,18 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
       .style('user-select', 'none')
       .each(function(d: any) {
         // Wrap text for better display
-        const text = d3.select(this);
-        const words = d.label.split(' ');
-        if (words.length > 1) {
-          text.text('');
-          words.forEach((word: string, i: number) => {
-            text.append('tspan')
-              .attr('x', 0)
-              .attr('dy', i === 0 ? '-0.3em' : '1.1em')
-              .text(word);
-          });
+        if (d.type !== 'central') {
+          const text = d3.select(this);
+          const words = d.title.split(' ');
+          if (words.length > 1) {
+            text.text('');
+            words.forEach((word: string, i: number) => {
+              text.append('tspan')
+                .attr('x', 0)
+                .attr('dy', i === 0 ? '-0.3em' : '1.1em')
+                .text(word.length > 15 ? word.substring(0, 12) + '...' : word);
+            });
+          }
         }
       });
 
@@ -248,18 +329,30 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
       nodeGroup.select('.main-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 55 : 35)
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 55 : 35;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        })
         .attr('filter', 'drop-shadow(0px 8px 24px rgba(139, 92, 246, 0.8))');
       
       nodeGroup.select('.glow-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 59 : 39);
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 59 : 39;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        });
 
       nodeGroup.select('.highlight-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 53 : 33);
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 53 : 33;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        });
       
       // Highlight connected links
       link.transition()
@@ -277,18 +370,30 @@ export default function NetworkGraph({ onNodeClick }: NetworkGraphProps) {
       nodeGroup.select('.main-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 50 : 30)
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 50 : 30;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        })
         .attr('filter', 'drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.4))');
       
       nodeGroup.select('.glow-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 54 : 34);
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 54 : 34;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        });
 
       nodeGroup.select('.highlight-circle')
         .transition()
         .duration(200)
-        .attr('r', d.type === 'central' ? 48 : 28);
+        .attr('r', (d: any) => {
+          const baseSize = d.type === 'central' ? 48 : 28;
+          const fitFactor = d.fit || 0.5;
+          return baseSize * (0.5 + 0.5 * fitFactor);
+        });
       
       link.transition()
         .duration(200)

@@ -2,39 +2,29 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import NetworkGraph from "./NetworkGraph";
+import ExposureForm from "./ExposureForm";
+import { ExposureFormValues } from '@/lib/schemas';
 
 interface ChatContainerProps {
   showCanvas: boolean;
   setShowCanvas: (show: boolean) => void;
 }
 
-// Helper function to get metric descriptions
-function getMetricDescription(metricId: string): string {
-  const descriptions: Record<string, string> = {
-    'volatility': 'Measures the degree of variation in hedge performance over time. Higher volatility indicates greater uncertainty and risk in the portfolio.',
-    'exposure': 'Total risk exposure across all hedge positions. Represents the aggregate amount at risk in your portfolio.',
-    'sharpe-ratio': 'Risk-adjusted return metric that measures returns per unit of risk. Higher Sharpe ratios indicate better risk-adjusted performance.',
-    'max-drawdown': 'Maximum observed loss from a peak to a trough. Represents the worst-case historical loss scenario.',
-    'beta': 'Market correlation coefficient measuring systematic risk. Beta > 1 indicates higher volatility than the market.',
-    'var': 'Value at Risk at 95% confidence level. The maximum expected loss under normal market conditions.',
-    'risk-score': 'Composite risk assessment aggregating multiple risk factors into a single score.',
-    'correlation': 'Measures the statistical relationship between different assets in the portfolio.',
-    'duration': 'Time-based risk measure indicating sensitivity to interest rate changes.',
-    'hedge-ratio': 'Optimal position sizing for hedging. Determines the effectiveness of your hedge.',
-    'liquidity': 'Ability to quickly exit positions without significant price impact.',
-    'cost-basis': 'Initial investment cost serving as the baseline for profit and loss calculations.'
-  };
-  
-  return descriptions[metricId] || 'Financial metric for risk analysis and portfolio management.';
+// Helper function to get market descriptions
+function getMarketDescription(node: { title: string; fit: number; liquidity: number }): string {
+  return `Market: ${node.title}
+Fit Score: ${Math.round((node.fit || 0) * 100)}%
+Liquidity: $${(node.liquidity || 0).toLocaleString()}`;
 }
 
 export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContainerProps) {
   const [inputValue, setInputValue] = useState("");
-  const [selectedNode, setSelectedNode] = useState<{ id: string; label: string; type: string } | null>(null);
+  const [selectedNode, setSelectedNode] = useState<{ id: string; title: string; fit: number; liquidity: number; type: string } | null>(null);
+  const [showExposureForm, setShowExposureForm] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Memoize the callback to prevent NetworkGraph from re-rendering
-  const handleNodeClick = useCallback((node: { id: string; label: string; type: string }) => {
+  const handleNodeClick = useCallback((node: { id: string; title: string; fit: number; liquidity: number; type: string }) => {
     setSelectedNode(node);
   }, []);
 
@@ -43,7 +33,13 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
     if (inputValue.trim()) {
       setInputValue("");
       setShowCanvas(true);
+      setShowExposureForm(false);
     }
+  };
+
+  const handleExposureSubmit = (data: ExposureFormValues) => {
+    setShowExposureForm(false);
+    setShowCanvas(true);
   };
 
   const handleInput = () => {
@@ -151,6 +147,18 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
             </div>
           </div>
         </>
+      ) : showExposureForm ? (
+        <div className="p-6">
+          <div className="mb-6 flex gap-4">
+            <button 
+              className="action-btn secondary"
+              onClick={() => setShowExposureForm(false)}
+            >
+              ← Back to Graph
+            </button>
+          </div>
+          <ExposureForm onSubmit={handleExposureSubmit} />
+        </div>
       ) : (
         <div style={{ 
           position: "fixed",
@@ -219,14 +227,14 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
                 fontSize: "20px",
                 fontWeight: 700
               }}>
-                {selectedNode.label}
+                {selectedNode.title}
               </h3>
               
               {/* Node type badge */}
               <div style={{
                 display: "inline-block",
-                background: selectedNode.type === 'central' ? "rgba(255, 255, 255, 0.2)" : "rgba(139, 92, 246, 0.3)",
-                border: `1px solid ${selectedNode.type === 'central' ? "#ffffff66" : "#8b5cf666"}`,
+                background: selectedNode.type === 'central' ? "rgba(255, 255, 255, 0.2)" : "rgba(16, 185, 129, 0.3)",
+                border: `1px solid ${selectedNode.type === 'central' ? "#ffffff66" : "#10b98166"}`,
                 borderRadius: "8px",
                 padding: "6px 12px",
                 fontSize: "12px",
@@ -234,10 +242,10 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
                 fontWeight: 600,
                 textTransform: "capitalize"
               }}>
-                {selectedNode.type === 'central' ? 'Central Metric' : 'Risk Metric'}
+                {selectedNode.type === 'central' ? 'Exposure Statement' : 'Market Node'}
               </div>
               
-              {/* Description based on metric type */}
+              {/* Description based on market type */}
               <div style={{marginBottom: "16px"}}>
                 <div style={{
                   color: "#9ca3af", 
@@ -256,11 +264,11 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
                   borderRadius: "8px",
                   border: "1px solid rgba(255, 255, 255, 0.05)"
                 }}>
-                  {getMetricDescription(selectedNode.id)}
+                  {getMarketDescription(selectedNode)}
                 </div>
               </div>
               
-              {/* Importance indicator */}
+              {/* Fit score indicator */}
               <div style={{
                 marginBottom: "16px"
               }}>
@@ -269,9 +277,9 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
                   justifyContent: "space-between",
                   marginBottom: "6px"
                 }}>
-                  <div style={{color: "#9ca3af", fontSize: "14px"}}>Importance</div>
-                  <div style={{fontWeight: 600, color: "#6366f1"}}>
-                    {selectedNode.type === 'central' ? 'High' : 'Medium'}
+                  <div style={{color: "#9ca3af", fontSize: "14px"}}>Fit Score</div>
+                  <div style={{fontWeight: 600, color: selectedNode.fit > 0.6 ? "#10b981" : "#ef4444"}}>
+                    {Math.round((selectedNode.fit || 0) * 100)}%
                   </div>
                 </div>
                 <div style={{
@@ -282,7 +290,36 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
                 }}>
                   <div style={{
                     height: "100%",
-                    width: selectedNode.type === 'central' ? '90%' : '70%',
+                    width: `${(selectedNode.fit || 0) * 100}%`,
+                    background: selectedNode.fit > 0.6 ? "linear-gradient(90deg, #10b981, #059669)" : "linear-gradient(90deg, #ef4444, #dc2626)",
+                    borderRadius: "3px"
+                  }}></div>
+                </div>
+              </div>
+              
+              {/* Liquidity indicator */}
+              <div style={{
+                marginBottom: "16px"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "6px"
+                }}>
+                  <div style={{color: "#9ca3af", fontSize: "14px"}}>Liquidity</div>
+                  <div style={{fontWeight: 600, color: "#6366f1"}}>
+                    ${(selectedNode.liquidity || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{
+                  height: "6px",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  borderRadius: "3px",
+                  overflow: "hidden"
+                }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${Math.min(100, (selectedNode.liquidity || 0) / 1000000 * 100)}%`,
                     background: "linear-gradient(90deg, #6366f1, #8b5cf6)",
                     borderRadius: "3px"
                   }}></div>
@@ -292,11 +329,41 @@ export default function ChatContainer({ showCanvas, setShowCanvas }: ChatContain
           )}
 
           <button
-            onClick={() => setShowCanvas(false)}
+            onClick={() => setShowExposureForm(true)}
             style={{
               position: "fixed",
               bottom: 24,
               left: "calc(280px + 24px)",
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              color: "#fff",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: "12px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "14px",
+              boxShadow: "0 4px 16px rgba(16, 185, 129, 0.4)",
+              transition: "all 0.3s",
+              zIndex: 1000
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 6px 24px rgba(16, 185, 129, 0.6)";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(16, 185, 129, 0.4)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Define Exposure
+          </button>
+          
+          <button
+            onClick={() => setShowCanvas(false)}
+            style={{
+              position: "fixed",
+              bottom: 24,
+              left: "calc(280px + 24px + 180px + 16px)",
               background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
               color: "#fff",
               border: "none",

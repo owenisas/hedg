@@ -5,17 +5,20 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
+    "export": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.16",
     "@types/d3": "^7.4.3",
+    "axios": "^1.13.1",
     "d3": "^7.9.0",
     "next": "14.0.0",
     "react": "^18",
     "react-dom": "^18",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^20",

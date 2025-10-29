@@ -4,9 +4,10 @@ import { useState } from "react";
 
 interface SidebarProps {
   onNewHedge?: () => void;
+  onViewChange?: (view: 'chat' | 'execution' | 'positions' | 'candidates' | 'exposure') => void;
 }
 
-export default function Sidebar({ onNewHedge }: SidebarProps) {
+export default function Sidebar({ onNewHedge, onViewChange }: SidebarProps) {
   const [activeHedge, setActiveHedge] = useState<string | null>(null);
 
   const handleNewHedge = () => {
@@ -19,6 +20,12 @@ export default function Sidebar({ onNewHedge }: SidebarProps) {
   const handleHedgeClick = (hedgeName: string) => {
     setActiveHedge(hedgeName === activeHedge ? null : hedgeName);
     console.log(`Selected hedge: ${hedgeName}`);
+  };
+
+  const handleViewChange = (view: 'chat' | 'execution' | 'positions' | 'candidates' | 'exposure') => {
+    if (onViewChange) {
+      onViewChange(view);
+    }
   };
 
   return (
@@ -99,6 +106,88 @@ export default function Sidebar({ onNewHedge }: SidebarProps) {
               </div>
               <span className="hedge-name">Commodity Protection</span>
             </div>
+          </div>
+        </div>
+        <div className="navigation-section">
+          <div className="section-header">
+            <h3 className="hedges-title">Navigation</h3>
+          </div>
+          <div className="navigation-list">
+            <button 
+              className="hedge-item"
+              onClick={() => handleViewChange('exposure')}
+            >
+              <div className="hedge-icon">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <span className="hedge-name">Define Exposure</span>
+            </button>
+            <button 
+              className="hedge-item"
+              onClick={() => handleViewChange('execution')}
+            >
+              <div className="hedge-icon">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+              </div>
+              <span className="hedge-name">Execution Sheet</span>
+            </button>
+            <button 
+              className="hedge-item"
+              onClick={() => handleViewChange('positions')}
+            >
+              <div className="hedge-icon">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+              </div>
+              <span className="hedge-name">Positions</span>
+            </button>
+            <button 
+              className="hedge-item"
+              onClick={() => handleViewChange('candidates')}
+            >
+              <div className="hedge-icon">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <span className="hedge-name">Candidates</span>
+            </button>
           </div>
         </div>
       </div>
