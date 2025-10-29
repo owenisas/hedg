@@ -35,15 +35,19 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 This project is configured for automatic deployment to GitHub Pages. On every push to the `main` branch, GitHub Actions will:
 
 1. Build the Next.js static export
-2. Deploy to GitHub Pages
+2. Deploy to the `gh-pages` branch
+3. GitHub Pages serves from the `gh-pages` branch
 
 ### Manual Deployment Setup
 
 If you're setting this up for the first time:
 
 1. Go to your repository Settings → Pages
-2. Under "Build and deployment", set Source to "GitHub Actions"
-3. The workflow will automatically run on the next push to `main`
+2. Under "Build and deployment":
+   - Set **Source** to: **Deploy from a branch**
+   - Set **Branch** to: **gh-pages** and **/ (root)**
+3. Save the settings
+4. The workflow will create the `gh-pages` branch automatically on the next push to `main`
 
 ### Local Build
 
